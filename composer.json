@@ -1,0 +1,16 @@
+{
+    "name": "peshmerge/webkew-image-dominant-color-generator.php",
+    "description": "A WordPress plugin that automatically generates a dominant color and a colors palette (6 colors) for any uploaded image to the WordPress media library.",
+    "type": "library",
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Peshmerge Morad",
+            "email": "p.morad@hotmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "ksubileau/color-thief-php": "^2.0"
+    }
+}

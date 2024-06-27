@@ -1,0 +1,13 @@
+.colors-palette-color, #dominant-color{
+    width: 40px;
+    height: 40px;
+    display: inline-block;
+    box-sizing: border-box;
+    margin: 1px;
+}
+.colors-palette-color.selected {
+    border: 2px solid black;
+}
+.colors-palette-color:hover {
+    border: 2px solid #f9bc40;
+}
