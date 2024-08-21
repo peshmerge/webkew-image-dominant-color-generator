@@ -5,98 +5,106 @@ Description:Automatically generate a dominant color and a colors palette (6 colo
 Version: 1.0.0
 Text Domain: webkew-image-dominant-color-generator
 Author: Peshmerge Morad
+License: GPLv3 or later
+License URI: http://www.gnu.org/licenses/gpl-3.0.html
 Author URI: https://peshmerge.io
 */
+if (!defined('ABSPATH')) exit; // Exit if accessed directly
 
 require __DIR__ . '/vendor/autoload.php';
 
 use ColorThief\ColorThief;
 
 //The number of colors in the colors palette.
-const COLORS_COUNT = 6;
+const WKIDCG_COLORS_COUNT = 6;
 // Any number between 0 and 10. 10 very high and this more computationally expensive.
-const COLORS_QUALITY = 5;
+const WKIDCG_COLORS_QUALITY = 5;
 
-add_action('admin_enqueue_scripts', 'webkew_cifdc_enqueue_color_picker');
-function webkew_cifdc_enqueue_color_picker($hook_suffix)
-{
-    // Not, on the settings page, don't load anything!
-    if ('options-general.php' !== $hook_suffix) {
-        return;
-    }
-    wp_enqueue_style('wp-color-picker');
-    wp_enqueue_script('wp-color-picker');
-    wp_add_inline_script('wp-color-picker', '
-        (function( $ ) {
-            "use strict";
-            jQuery(document).ready(function($) {
-                $(".webkew-idcg-fallback-color-setting-cl").wpColorPicker();
-            });
-        })(jQuery);
-    ');
-}
-
-add_action('admin_enqueue_scripts', 'webkew_cifdc_enqueue_admin_scripts');
-function webkew_cifdc_enqueue_admin_scripts()
+//Enqueue the CSS and JS files for handling the dominant color and the colors palette
+add_action('admin_enqueue_scripts', 'wkidcg_enqueue_admin_scripts');
+function wkidcg_enqueue_admin_scripts($hook_suffix)
 {
     $screen = get_current_screen();
-//    Enqueue the scripts when are dealing with custom post types, posts, pages and in the media library
-    if ($screen && ($screen->base === 'post' || $screen->id === 'upload' || $screen->id === 'post') || $screen->id === 'page') {
+    //Enqueue the scripts when are dealing with custom post types, posts, pages and in the media library
+    if ($screen && in_array($screen->base, ['post', 'upload', 'page'])) {
+        wp_register_style(
+            'wkidcg-admin-css',
+            plugins_url('css/wkidcg-admin.css', __FILE__),
+            [],
+            1.0,
+            false
+        );
+        wp_enqueue_style('wkidcg-admin-css');
+
         wp_register_script(
-            'webkew-idcg-js',
-            plugins_url('js/webkew-idcg-admin.js', __FILE__),
-            array('jquery'),
+            'wkidcg-admin-js',
+            plugins_url('js/wkidcg-admin.js', __FILE__),
+            [],
             1.0,
             true
         );
-        wp_enqueue_script('webkew-idcg-js');
+        wp_enqueue_script('wkidcg-admin-js');
+    }
 
-
-        wp_register_style('webkew-idcg-css', plugins_url('css/webkew-idcg-admin.css', __FILE__), [], 1.0);
-        wp_enqueue_style('webkew-idcg-css');
+    // Only load on the settings page
+    if ('options-general.php' === $hook_suffix) {
+        wp_enqueue_style('wp-color-picker');
+        wp_enqueue_script('wp-color-picker');
+        wp_add_inline_script('wp-color-picker', '
+        (function($) {
+            "use strict";
+            jQuery(document).ready(function($) {
+                $(".wkidcg-fallback-color-setting-cl").wpColorPicker();
+            });
+        })(jQuery);
+    ');
     }
 }
 
-// Register the setting
-function webkew_idcg_register_settings()
+add_action('admin_init', 'wkidcg_register_settings');
+// Register the fallback color for the plugin.
+function wkidcg_register_settings()
 {
-    register_setting('general', 'webkew_idcg_fallback_color_setting', array(
+    register_setting('general', 'wkidcg_fallback_color_setting', array(
         'type' => 'string',
         'sanitize_callback' => 'sanitize_hex_color',
         'default' => '#f9bc40',
     ));
 }
 
-add_action('admin_init', 'webkew_idcg_register_settings');
-
-// Add the color picker field to the settings page
-function webkew_settings_field()
+// Add the color picker field to the settings page for the fallback color field, added previously
+function wkidcg_settings_field()
 {
     ?>
     <tr>
-        <th scope="row"><label for="webkew_idcg_fallback_color_setting">
-                <?php esc_html_e('Select a fallback color', 'webkew-image-dominant-color-generator') ?></label></th>
+        <th scope="row"><label for="wkidcg_fallback_color_setting">
+                <?php esc_html_e('Select a fallback color', 'webkew-image-dominant-color-generator') ?>
+            </label>
+        </th>
         <td>
-            <input type="text" id="webkew_idcg_fallback_color_setting" name="webkew_idcg_fallback_color_setting"
-                   value="<?php echo esc_attr(get_option('webkew_idcg_fallback_color_setting')); ?>"
-                   class="webkew-idcg-fallback-color-setting-cl" data-default-color="#f9bc40"/>
+            <input type="text" id="wkidcg_fallback_color_setting" name="wkidcg_fallback_color_setting"
+                   value="<?php echo esc_attr(get_option('wkidcg_fallback_color_setting')); ?>"
+                   class="wkidcg-fallback-color-setting-cl" data-default-color="#f9bc40"/>
         </td>
     </tr>
     <?php
 }
 
+
+// Add the fallback color field to the settings page
 add_action('admin_init', function () {
     add_settings_field(
-        'webkew_cifdc_fallback_color_setting',
+        'wkidcg_fallback_color_setting',
         __('WebKew Image Dominant Color Generator - Fallback color', 'webkew-image-dominant-color-generator'),
-        'webkew_settings_field',
+        'wkidcg_settings_field',
         'general'
     );
 });
 
 
-add_action('plugins_loaded', 'webkew_idcg_init');
-function webkew_idcg_init()
+add_action('plugins_loaded', 'wkidcg_init');
+// Load the plugin's text domain
+function wkidcg_init()
 {
     load_plugin_textdomain(
         'webkew-image-dominant-color-generator',
@@ -105,77 +113,81 @@ function webkew_idcg_init()
     );
 }
 
-// Register the shortcode with WordPress
-add_shortcode('dominant_color_pesho', 'get_dominant_color_shortcode1');
-function get_dominant_color_shortcode1($attributes)
-{
-
-}
-
-add_action('add_attachment', 'generate_dominant_color_and_colors_palette_for_uploaded_image', 10, 1);
-function generate_dominant_color_and_colors_palette_for_uploaded_image($attachment_id)
+add_action('add_attachment', 'wkidcg_generate_dominant_color_and_colors_palette_for_uploaded_image');
+// Generate the dominant color and the colors palette when an attachment (image) is successfully added to the media lib.
+function wkidcg_generate_dominant_color_and_colors_palette_for_uploaded_image($attachment_id)
 {
     if (!wp_attachment_is_image($attachment_id)) {
         return "Attachment is not an image!";
     }
     try {
         $image = get_attached_file($attachment_id);
-        $dominant_color = ColorThief::getColor($image, COLORS_QUALITY, null, 'hex');
-        $colors_palette = ColorThief::getPalette($image, COLORS_COUNT, COLORS_QUALITY, null, 'hex');
+        $dominant_color = ColorThief::getColor($image, WKIDCG_COLORS_QUALITY, null, 'hex');
+        $colors_palette = ColorThief::getPalette($image, WKIDCG_COLORS_COUNT, WKIDCG_COLORS_QUALITY, null, 'hex');
     } catch (Exception $exception) {
         return $exception;
     }
-    update_post_meta($attachment_id, 'webkew_dominant_color', $dominant_color);
-    update_post_meta($attachment_id, 'webkew_colors_palette', $colors_palette);
+    // Save the generated dominant color and the colors palette for the uploaded media!
+    update_post_meta($attachment_id, 'wkidcg_dominant_color', $dominant_color);
+    update_post_meta($attachment_id, 'wkidcg_colors_palette', $colors_palette);
 }
 
 
-function get_colors_palette($attachment_id)
+// Helper to fetch the colors palette of an attachment (image)
+function wkidcg_get_colors_palette($attachment_id)
 {
-    $colors_palette = get_post_meta($attachment_id, 'webkew_colors_palette', true);
+    $colors_palette = get_post_meta($attachment_id, 'wkidcg_colors_palette', true);
     if (!$colors_palette) {
-        generate_dominant_color_and_colors_palette_for_uploaded_image($attachment_id);
-        return get_post_meta($attachment_id, 'webkew_colors_palette', true);
+        wkidcg_generate_dominant_color_and_colors_palette_for_uploaded_image($attachment_id);
+        return get_post_meta($attachment_id, 'wkidcg_colors_palette', true);
     }
     return $colors_palette;
 }
 
-function get_dominant_color($attachment_id)
+// Helper to fetch the dominant color of an attachment (image)
+function wkidcg_get_dominant_color($attachment_id)
 {
-    return get_post_meta($attachment_id, 'webkew_dominant_color', true);
+    return get_post_meta($attachment_id, 'wkidcg_dominant_color', true);
 }
 
-add_filter('attachment_fields_to_edit', 'add_colors_palette_fields', 10, 2);
-function add_colors_palette_fields($form_fields, $post)
+
+add_filter('attachment_fields_to_edit', 'wkidcg_add_colors_palette_fields', 10, 2);
+
+// Add the dominant color and the colors palette and other options to the end of the attachment (image) frame.
+function wkidcg_add_colors_palette_fields($form_fields, $post)
 {
-    $colors_palette = get_colors_palette($post->ID);
-    $dominant_color = get_dominant_color($post->ID);
+    if (!wp_attachment_is_image($post->ID)) {
+        return;
+    }
+    $colors_palette = wkidcg_get_colors_palette($post->ID);
+    $dominant_color = wkidcg_get_dominant_color($post->ID);
 
     if (!$colors_palette || !$dominant_color) {
         $html = __('No colors palette available.', 'webkew-image-dominant-color-generator');
-        $html .= '<br /><a href="#" class="build-colors-palette" data-dominance-rebuild="' . $post->ID . '">';
+        $html .= '<br /><a href="#" class="build-colors-palette" data-dominance-rebuild="';
+        $html .= $post->ID . '" onclick="wkidcgBuildColorPalette(this)">';
         $html .= __('Generate colors palette', 'webkew-image-dominant-color-generator');
         $html .= '</a>';
     } else {
         $html_colors_palette_array = [];
         $html_colors_palette_array[] = "<ul>";
         foreach ($colors_palette as $color) {
-            $html = '<li class="colors-palette-color" title="' . $color . '"';
-            $html .= ' data-color="' . $color . '" style="background-color: ' . $color . '"></li>';
+            $html = '<li class="colors-palette-color" title="' . $color . '"data-color="' . $color . '"';
+            $html .= 'style="background-color: ' . $color . '" onclick="wkidcgChangeSelectedDominantColor(this)"></li>';
             $html_colors_palette_array[] = $html;
         }
         $html_colors_palette_array[] = "</ul>";
 
         $html = '<div id="colors-palette-container">' . implode($html_colors_palette_array) . '</div>';
-        $html .= '<br /><a href="#" class="build-colors-palette" data-dominance-rebuild="' . $post->ID . '">';
+        $html .= '<br /><a href="#" class="build-colors-palette" data-dominance-rebuild="';
+        $html .= $post->ID . '" onclick="wkidcgBuildColorPalette(this)">';
         $html .= __('Regenerate the colors palette', 'webkew-image-dominant-color-generator');
-        $html .= '</a> <sub>' . __('Requires closing and reopening the modal', 'webkew-image-dominant-color-generator') . '</sub>';
+        $html .= '</a> <sub>' . __('Requires closing and reopening the modal',
+                'webkew-image-dominant-color-generator') . '</sub>';
     }
 
-    $html .= '<script>assignEventListeners();</script>';
-
     $form_fields['webkew-dominant-color-selected'] = array(
-        'value' => get_post_meta($post->ID, 'webkew_dominant_color', true),
+        'value' => get_post_meta($post->ID, 'wkidcg_dominant_color', true),
         'class' => 'webkew-dominant-color-selected',
         'input' => 'hidden',
     );
@@ -190,8 +202,7 @@ function add_colors_palette_fields($form_fields, $post)
         'label' => __('Selected dominant color:', 'webkew-image-dominant-color-generator'),
     );
 
-
-    $form_fields['webkew-cifdc-color-palette'] = array(
+    $form_fields['wkidcg-color-palette'] = array(
         'value' => '',
         'input' => 'html',
         'html' => $html,
@@ -200,29 +211,39 @@ function add_colors_palette_fields($form_fields, $post)
     return $form_fields;
 }
 
-add_filter('attachment_fields_to_save', 'save_dominant_color', 10, 2);
-function save_dominant_color($post, $attachment)
+add_filter('attachment_fields_to_save', 'wkidcg_save_dominant_color', 10, 2);
+// Save the selected dominant color!
+function wkidcg_save_dominant_color($post, $attachment)
 {
     if (isset($attachment['webkew-dominant-color-selected'])) {
         if ($attachment['webkew-dominant-color-selected'] == 'build-colors-palette') {
-            generate_dominant_color_and_colors_palette_for_uploaded_image($post['ID']);
+            wkidcg_generate_dominant_color_and_colors_palette_for_uploaded_image($post['ID']);
         } else {
-            update_post_meta($post['ID'], 'webkew_dominant_color', $attachment['webkew-dominant-color-selected']);
+            update_post_meta($post['ID'], 'wkidcg_dominant_color', $attachment['webkew-dominant-color-selected']);
         }
     }
     return $post;
 }
 
 
-// Register the shortcode with WordPress
-add_shortcode('webkew_dc', 'get_webkew_dominant_color_shortcode');
-
-function get_webkew_dominant_color_shortcode($attributes)
+add_shortcode('webkew_dc', 'wkidcg_get_dominant_color_shortcode');
+/**
+ * Register the shortcode with WordPress. To be used as follows
+ * [webkew_dc]: in this case the fallback color will be returned
+ * [webkew_dc field_name=]: if field_name= "featured", the dominant color of the featured image is returned
+ * [webkew_dc field_name=]: if field_name= "field_x", the dominant color of the image of that field is returned
+ * [webkew_dc override_field=]: if override_field= "field_x", color given in that field_x will be picked up and returned.
+ *
+ * @param $attributes
+ * @return string
+ */
+function wkidcg_get_dominant_color_shortcode($attributes)
 {
     $attributes = shortcode_atts(array('field_name' => '', 'override_field' => ''), $attributes, 'webkew_dc');
 
     if (!array_key_exists('field_name', $attributes) || (!array_key_exists('override_field', $attributes))) {
-        return __("All attributes field_name and override_field  must be present!", 'webkew-image-dominant-color-generator');
+        return __("All attributes field_name and override_field  must be present!",
+            'webkew-image-dominant-color-generator');
     }
 
     if (!is_singular()) {
@@ -233,7 +254,7 @@ function get_webkew_dominant_color_shortcode($attributes)
     }
     $post_id = get_the_ID();
 
-// We have override_field filled. Then ignore anything else and return it.
+    // We have override_field filled. Then ignore anything else and return it.
     if (!empty($attributes['override_field'])) {
         //Assumption that this contains a Hex color code
         $dominant_color = get_post_meta($post_id, $attributes['override_field'], true);
@@ -257,13 +278,13 @@ function get_webkew_dominant_color_shortcode($attributes)
             $image_id = get_post_meta($post_id, $attributes['field_name'], true);
         }
         if ($image_id) {
-            $dominant_color = get_dominant_color($image_id);
+            $dominant_color = wkidcg_get_dominant_color($image_id);
             if (!empty($dominant_color)) {
                 return esc_html($dominant_color);
             }
         }
     }
 
-// Otherwise return the fall-back color
-    return esc_html(get_option('webkew_idcg_fallback_color_setting'));
+    // Otherwise return the fall-back color
+    return esc_html(get_option('wkidcg_fallback_color_setting'));
 }
